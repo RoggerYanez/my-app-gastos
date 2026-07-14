@@ -30,6 +30,7 @@ export default function DrawerLayout() {
       {/* Tus otras pantallas */}
       <Drawer.Screen name="gastos" options={{ title: 'Mis Gastos' }} />
       <Drawer.Screen name="estadisticas" options={{ title: 'Estadísticas' }} />
+      <Drawer.Screen name="herramientas" options={{ title: 'Herramientas' }} />
       <Drawer.Screen name="cuenta" options={{ title: 'Mi Cuenta' }} />
     </Drawer>
   );

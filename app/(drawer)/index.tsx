@@ -10,6 +10,8 @@ export default function RegistrarGasto() {
   const [esServicio, setEsServicio] = useState(false);
   const [fecha, setFecha] = useState(new Date());
   const [showPicker, setShowPicker] = useState(false);
+  
+  // router sigue aquí por si quieres añadir un botón manual de "Volver" más adelante
   const router = useRouter();
 
   const handleSave = async () => {
@@ -21,24 +23,31 @@ export default function RegistrarGasto() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // Lógica: Si es servicio, usamos la fecha seleccionada. Si no, usamos hoy.
-    const fechaFinal = esServicio ? fecha : new Date();
-
     const { error } = await supabase
       .from('gastos')
       .insert({
         user_id: user.id,
         categoria: categoria,
         monto: parseFloat(monto),
-        es_servicio: esServicio,
-        fecha_vencimiento: fechaFinal.toISOString()
+        fecha: new Date().toISOString(),
+        fecha_vencimiento: esServicio ? fecha.toISOString() : null,
+        estado_pago: false
       });
 
     if (error) {
-      Alert.alert('Error', 'No se pudo guardar el gasto');
+      console.error("Error al guardar:", error);
+      Alert.alert('Error', 'No se pudo guardar el gasto. Revisa tu conexión o permisos.');
     } else {
-      Alert.alert('Éxito', 'Gasto registrado');
-      router.back(); // Regresa a la pantalla anterior
+      // 1. Damos feedback visual
+      Alert.alert('Éxito', 'Gasto registrado correctamente');
+      
+      // 2. Limpiamos el formulario para permitir un nuevo registro inmediato
+      setCategoria('');
+      setMonto('');
+      setEsServicio(false);
+      setFecha(new Date());
+      
+      // 3. Ya no llamamos a router.back(), así evitamos el error de navegación
     }
   };
 
@@ -47,18 +56,18 @@ export default function RegistrarGasto() {
       <Text style={styles.label}>Categoría</Text>
       <TextInput 
         style={styles.input} 
-        placeholder="Ej: Luz, Comida, Transporte"
-        value={categoria}
-        onChangeText={setCategoria}
+        placeholder="Ej: Luz, Comida, Transporte" 
+        value={categoria} 
+        onChangeText={setCategoria} 
       />
 
       <Text style={styles.label}>Monto (S/)</Text>
       <TextInput 
         style={styles.input} 
-        placeholder="0.00"
-        keyboardType="numeric"
-        value={monto}
-        onChangeText={setMonto}
+        placeholder="0.00" 
+        keyboardType="numeric" 
+        value={monto} 
+        onChangeText={setMonto} 
       />
 
       <View style={styles.switchContainer}>
@@ -73,14 +82,14 @@ export default function RegistrarGasto() {
             <Text>{fecha.toLocaleDateString()}</Text>
           </TouchableOpacity>
           {showPicker && (
-            <DateTimePicker
-              value={fecha}
-              mode="date"
+            <DateTimePicker 
+              value={fecha} 
+              mode="date" 
               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={(event, selectedDate) => {
-                setShowPicker(false);
-                if (selectedDate) setFecha(selectedDate);
-              }}
+              onChange={(event, selectedDate) => { 
+                setShowPicker(false); 
+                if (selectedDate) setFecha(selectedDate); 
+              }} 
             />
           )}
         </View>
@@ -94,12 +103,48 @@ export default function RegistrarGasto() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: '#fff' },
-  label: { fontSize: 16, marginBottom: 8, fontWeight: '600' },
-  input: { borderWidth: 1, borderColor: '#ddd', padding: 12, borderRadius: 8, marginBottom: 20 },
-  switchContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  dateContainer: { marginBottom: 20 },
-  dateButton: { padding: 15, backgroundColor: '#f0f0f0', borderRadius: 8, alignItems: 'center' },
-  button: { backgroundColor: '#007bff', padding: 15, borderRadius: 8, alignItems: 'center' },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' }
+  container: { 
+    flex: 1, 
+    padding: 20, 
+    backgroundColor: '#fff' 
+  },
+  label: { 
+    fontSize: 16, 
+    marginBottom: 8, 
+    fontWeight: '600' 
+  },
+  input: { 
+    borderWidth: 1, 
+    borderColor: '#ddd', 
+    padding: 12, 
+    borderRadius: 8, 
+    marginBottom: 20 
+  },
+  switchContainer: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginBottom: 20 
+  },
+  dateContainer: { 
+    marginBottom: 20 
+  },
+  dateButton: { 
+    padding: 15, 
+    backgroundColor: '#f0f0f0', 
+    borderRadius: 8, 
+    alignItems: 'center' 
+  },
+  button: { 
+    backgroundColor: '#007bff', 
+    padding: 15, 
+    borderRadius: 8, 
+    alignItems: 'center',
+    marginTop: 10
+  },
+  buttonText: { 
+    color: '#fff', 
+    fontSize: 16, 
+    fontWeight: 'bold' 
+  }
 });
