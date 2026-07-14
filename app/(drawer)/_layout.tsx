@@ -15,7 +15,7 @@ function CustomDrawerContent(props: any) {
           await supabase.auth.signOut();
           router.replace('/iniciar_sesion');
         }}
-        activeTintColor="red"
+        inactiveTintColor="red"
       />
     </DrawerContentScrollView>
   );
@@ -24,9 +24,13 @@ function CustomDrawerContent(props: any) {
 export default function DrawerLayout() {
   return (
     <Drawer drawerContent={(props) => <CustomDrawerContent {...props} />}>
+      {/* 'index' es el archivo principal (Registrar Gasto) */}
       <Drawer.Screen name="index" options={{ title: 'Registrar Gasto' }} />
-      {/* Si tienes otras pantallas, agrégalas aquí */}
-      {/* <Drawer.Screen name="gastos" options={{ title: 'Mis Gastos' }} /> */}
+      
+      {/* Tus otras pantallas */}
+      <Drawer.Screen name="gastos" options={{ title: 'Mis Gastos' }} />
+      <Drawer.Screen name="estadisticas" options={{ title: 'Estadísticas' }} />
+      <Drawer.Screen name="cuenta" options={{ title: 'Mi Cuenta' }} />
     </Drawer>
   );
 }
