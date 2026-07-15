@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "mi-app",
-    "slug": "mi-app",
+    "name": "Control-Hogar",
+    "slug": "Control-Hogar",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
