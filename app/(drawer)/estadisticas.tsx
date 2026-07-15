@@ -1,11 +1,11 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text } from 'react-native';
-import { BarChart, LineChart, PieChart } from 'react-native-chart-kit';
+import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { BarChart, PieChart } from 'react-native-chart-kit';
 import { supabase } from '../../lib/supabase';
 
 export default function Estadisticas() {
-  const [chartData, setChartData] = useState<any>(null);
+  const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const screenWidth = Dimensions.get('window').width - 40;
 
@@ -16,90 +16,110 @@ export default function Estadisticas() {
 
     const { data, error } = await supabase
       .from('gastos')
-      .select('categoria, monto')
+      .select('categoria, monto, fecha, estado_pago')
       .eq('user_id', user.id);
 
-    if (error) {
-      console.error(error);
-      setLoading(false);
-      return;
-    }
+    if (error || !data) { setLoading(false); return; }
 
-    // --- LÓGICA DE NORMALIZACIÓN Y AGRUPADO ---
-    const agrupado = data.reduce((acc: any, curr: any) => {
-      // 1. Limpiamos: Quitamos espacios y minúsculas para comparar
-      const rawCat = curr.categoria || 'Otros';
-      const cleanCat = rawCat.trim().toLowerCase();
-      // 2. Capitalizamos: Primera letra mayúscula para mostrar
-      const cat = cleanCat.charAt(0).toUpperCase() + cleanCat.slice(1);
-      
-      acc[cat] = (acc[cat] || 0) + Number(curr.monto);
-      return acc;
-    }, {});
+    const now = new Date();
+    const currentMonth = now.getMonth();
 
-    // Preparar colores
-    const colores = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'];
+    let totalPagado = 0;
+    let totalPendiente = 0;
+    const porCategoria: any = {};
 
-    // 3. Formatear datos para los gráficos
-    const etiquetas = Object.keys(agrupado);
-    const valores = Object.values(agrupado) as number[];
+    data.forEach((gasto: any) => {
+      const date = new Date(gasto.fecha);
+      if (date.getMonth() === currentMonth) {
+        const monto = Number(gasto.monto);
+        
+        if (gasto.estado_pago) totalPagado += monto;
+        else totalPendiente += monto;
 
-    const pieData = etiquetas.map((cat, index) => ({
-      name: cat,
-      population: agrupado[cat],
-      color: colores[index % colores.length],
-      legendFontColor: "#7F7F7F",
-      legendFontSize: 12
-    }));
-
-    setChartData({
-      pie: pieData,
-      bar: { labels: etiquetas, datasets: [{ data: valores }] },
-      line: { labels: etiquetas, datasets: [{ data: valores }] }
+        if (!porCategoria[gasto.categoria]) porCategoria[gasto.categoria] = 0;
+        porCategoria[gasto.categoria] += monto;
+      }
     });
 
+    setStats({ 
+      totalPagado, 
+      totalPendiente, 
+      totalGeneral: totalPagado + totalPendiente, 
+      porCategoria 
+    });
     setLoading(false);
   };
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchEstadisticas();
-    }, [])
-  );
-
-  const chartConfig = {
-    backgroundGradientFrom: "#fff",
-    backgroundGradientTo: "#fff",
-    color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-    decimalPlaces: 0,
-  };
+  useFocusEffect(useCallback(() => { fetchEstadisticas(); }, []));
 
   if (loading) return <ActivityIndicator size="large" style={{ marginTop: 50 }} />;
 
+  const pieData = [
+    { name: 'Pagado', population: stats.totalPagado, color: '#28a745', legendFontColor: '#7F7F7F' },
+    { name: 'Pendiente', population: stats.totalPendiente, color: '#dc3545', legendFontColor: '#7F7F7F' }
+  ];
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 50 }}>
-      <Text style={styles.title}>Mis Estadísticas</Text>
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
+      <Text style={styles.title}>Resumen del Mes</Text>
 
-      {chartData ? (
-        <>
-          <Text style={styles.subtitle}>Distribución (%)</Text>
-          <PieChart data={chartData.pie} width={screenWidth} height={200} chartConfig={chartConfig} accessor={"population"} backgroundColor={"transparent"} paddingLeft={"15"} />
+      {/* 1. TARJETA PRINCIPAL: PRESUPUESTO TOTAL */}
+      <View style={[styles.summaryBox, { backgroundColor: '#e3f2fd', marginBottom: 15 }]}>
+        <Text style={{color: '#007bff', fontWeight: 'bold'}}>Total Comprometido</Text>
+        <Text style={[styles.summaryValue, { fontSize: 26 }]}>S/ {stats.totalGeneral.toFixed(2)}</Text>
+      </View>
 
-          <Text style={styles.subtitle}>Comparativa por Categoría</Text>
-          <BarChart data={chartData.bar} width={screenWidth} height={220} chartConfig={chartConfig} yAxisLabel="S/" />
+      {/* 2. TARJETAS SECUNDARIAS: AVANCE */}
+      <View style={styles.rowContainer}>
+        <View style={styles.summaryBoxHalf}>
+          <Text style={{color: '#28a745', fontWeight: 'bold'}}>Ya Pagado</Text>
+          <Text style={styles.summaryValue}>S/ {stats.totalPagado.toFixed(2)}</Text>
+        </View>
+        <View style={styles.summaryBoxHalf}>
+          <Text style={{color: '#dc3545', fontWeight: 'bold'}}>Pendiente</Text>
+          <Text style={styles.summaryValue}>S/ {stats.totalPendiente.toFixed(2)}</Text>
+        </View>
+      </View>
 
-          <Text style={styles.subtitle}>Tendencia</Text>
-          <LineChart data={chartData.line} width={screenWidth} height={220} chartConfig={chartConfig} yAxisLabel="S/" />
-        </>
-      ) : (
-        <Text style={{ textAlign: 'center' }}>No hay suficientes datos</Text>
-      )}
+      {/* 3. GRÁFICOS */}
+      <Text style={styles.subtitle}>Estado de Pagos (Visual)</Text>
+      <PieChart
+        data={pieData}
+        width={screenWidth}
+        height={180}
+        chartConfig={{ color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})` }}
+        accessor="population"
+        backgroundColor="transparent"
+        paddingLeft="15"
+      />
+
+      <Text style={styles.subtitle}>Distribución por Categoría</Text>
+      <BarChart
+        data={{
+          labels: Object.keys(stats.porCategoria),
+          datasets: [{ data: Object.values(stats.porCategoria) }]
+        }}
+        width={screenWidth}
+        height={220}
+        yAxisLabel="S/"
+        chartConfig={{
+          backgroundColor: "#fff",
+          backgroundGradientFrom: "#fff",
+          backgroundGradientTo: "#fff",
+          decimalPlaces: 0,
+          color: (opacity = 1) => `rgba(0, 123, 255, ${opacity})`,
+        }}
+      />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: '#fff' },
-  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
-  subtitle: { fontSize: 18, fontWeight: '600', marginTop: 30, marginBottom: 10 }
+  title: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
+  subtitle: { fontSize: 18, fontWeight: '600', marginTop: 20, marginBottom: 10 },
+  rowContainer: { flexDirection: 'row', justifyContent: 'space-between' },
+  summaryBox: { alignItems: 'center', padding: 20, borderRadius: 15, width: '100%' },
+  summaryBoxHalf: { alignItems: 'center', backgroundColor: '#f8f9fa', padding: 15, borderRadius: 10, width: '48%' },
+  summaryValue: { fontSize: 18, fontWeight: 'bold', marginTop: 5 }
 });

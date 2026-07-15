@@ -9,11 +9,19 @@ export default function IniciarSesion() {
   const router = useRouter();
 
   async function iniciarSesion() {
-    // Usamos .ilike para que no importe mayúsculas o minúsculas
+    // .trim() elimina espacios al inicio y al final
+    const cleanUsername = username.trim();
+
+    if (!cleanUsername || !password) {
+      Alert.alert('Error', 'Por favor ingresa usuario y contraseña');
+      return;
+    }
+
+    // Usamos el nombre limpio para buscar en la base de datos
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('email')
-      .ilike('username', username) 
+      .ilike('username', cleanUsername) 
       .single();
 
     if (profileError || !profile) {
@@ -43,6 +51,7 @@ export default function IniciarSesion() {
         value={username} 
         onChangeText={setUsername} 
         autoCapitalize="none"
+        autoCorrect={false} // Recomendado para nombres de usuario
       />
       <TextInput 
         style={styles.input} 
