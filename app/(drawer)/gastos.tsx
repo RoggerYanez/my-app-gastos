@@ -1,5 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import React, { useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native'; // Importamos el hook
+import React, { useCallback, useState } from 'react'; // Importamos useCallback
 import { Alert, FlatList, SafeAreaView, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { supabase } from '../../lib/supabase';
 
@@ -10,9 +11,12 @@ export default function MisGastos() {
   // Detectar el modo del sistema (dark/light)
   const isDark = useColorScheme() === 'dark';
 
-  useEffect(() => {
-    fetchGastos();
-  }, []);
+  // useFocusEffect reemplaza al useEffect para recargar cada vez que entras a la pantalla
+  useFocusEffect(
+    useCallback(() => {
+      fetchGastos();
+    }, [])
+  );
 
   async function fetchGastos() {
     setLoading(true);
@@ -43,7 +47,7 @@ export default function MisGastos() {
     if (error) {
       Alert.alert("Error", "No se pudo actualizar el estado");
     } else {
-      fetchGastos();
+      fetchGastos(); // Recargamos localmente tras el cambio
     }
   };
 
