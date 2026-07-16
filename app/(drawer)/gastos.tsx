@@ -1,105 +1,76 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { supabase } from '../../lib/supabase';
 
-interface Gasto {
-  id: number;
-  categoria: string;
-  monto: number;
-  fecha: string;
-  fecha_vencimiento: string | null;
-  estado_pago: boolean;
-}
+export default function RegistrarGasto() {
+  const [categoria, setCategoria] = useState('');
+  const [monto, setMonto] = useState('');
+  const [esServicio, setEsServicio] = useState(false);
+  const [fecha, setFecha] = useState(new Date());
+  const [showPicker, setShowPicker] = useState(false);
+  const isDark = useColorScheme() === 'dark';
 
-export default function MisGastos() {
-  const [gastos, setGastos] = useState<Gasto[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const fetchGastos = async () => {
-    setRefreshing(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
-        .from('gastos')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('id', { ascending: false });
-
-      if (error) throw error;
-      setGastos(data || []);
-    } catch (error) {
-      console.error("Error al obtener datos:", error);
-      Alert.alert('Error', 'No se pudieron cargar los gastos');
-    } finally {
-      setRefreshing(false);
+  const handleSave = async () => {
+    if (!categoria || !monto) {
+      Alert.alert('Error', 'Por favor llena todos los campos');
+      return;
     }
-  };
-
-  const togglePago = async (id: number, estadoActual: boolean) => {
-    const nuevoEstado = !estadoActual;
-    
-    // 1. Cambio optimista (UI)
-    setGastos(prev => prev.map(g => g.id === id ? { ...g, estado_pago: nuevoEstado } : g));
-
-    // 2. Ejecución en base de datos
-    const { error } = await supabase
-      .from('gastos')
-      .update({ estado_pago: nuevoEstado })
-      .eq('id', id);
-
-    // 3. Verificación de error
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { error } = await supabase.from('gastos').insert({
+      user_id: user.id,
+      categoria: categoria,
+      monto: parseFloat(monto),
+      fecha: new Date().toISOString(),
+      fecha_vencimiento: esServicio ? fecha.toISOString() : null,
+      estado_pago: false
+    });
     if (error) {
-      console.error("ERROR CRÍTICO AL ACTUALIZAR:", error); // <-- MIRA ESTO EN LA CONSOLA
-      Alert.alert('Error', 'No tienes permiso para actualizar este gasto. Revisa tus políticas RLS.');
-      // Revertimos
-      setGastos(prev => prev.map(g => g.id === id ? { ...g, estado_pago: estadoActual } : g));
+      Alert.alert('Error', 'No se pudo guardar.');
     } else {
-      console.log("Cambio guardado exitosamente en Supabase");
+      Alert.alert('Éxito', 'Gasto registrado');
+      setCategoria(''); setMonto(''); setEsServicio(false);
     }
   };
-
-  useFocusEffect(
-    useCallback(() => {
-      fetchGastos();
-    }, [])
-  );
 
   return (
-    <FlatList
-      data={gastos}
-      keyExtractor={(item) => item.id.toString()}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchGastos} />}
-      renderItem={({ item }) => (
-        <View style={[styles.card, { borderColor: item.estado_pago ? '#28a745' : '#dc3545', borderLeftWidth: 6 }]}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.categoria}>{item.categoria}</Text>
-            <Text style={styles.fecha}>{item.fecha_vencimiento ? `Vence: ${new Date(item.fecha_vencimiento).toLocaleDateString()}` : new Date(item.fecha).toLocaleDateString()}</Text>
-          </View>
-          <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>
-            <Text style={styles.monto}>S/{Number(item.monto).toFixed(2)}</Text>
-            <TouchableOpacity onPress={() => togglePago(item.id, item.estado_pago)} style={{padding: 5}}>
-              <Ionicons 
-                name={item.estado_pago ? "checkbox" : "square-outline"} 
-                size={28} 
-                color={item.estado_pago ? "#28a745" : "#6c757d"} 
-              />
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-      ListEmptyComponent={<Text style={styles.empty}>No hay gastos registrados.</Text>}
-    />
+    <View style={[styles.container, { backgroundColor: isDark ? '#121212' : '#fff' }]}>
+      <Text style={[styles.label, { color: isDark ? '#fff' : '#000' }]}>Categoría</Text>
+      <TextInput 
+        style={[styles.input, { backgroundColor: isDark ? '#1e1e1e' : '#fff', color: isDark ? '#fff' : '#000', borderColor: isDark ? '#444' : '#ddd' }]} 
+        placeholder="Ej: Luz, Comida" 
+        placeholderTextColor={isDark ? "#888" : "#999"}
+        value={categoria} 
+        onChangeText={setCategoria} 
+      />
+
+      <Text style={[styles.label, { color: isDark ? '#fff' : '#000' }]}>Monto (S/)</Text>
+      <TextInput 
+        style={[styles.input, { backgroundColor: isDark ? '#1e1e1e' : '#fff', color: isDark ? '#fff' : '#000', borderColor: isDark ? '#444' : '#ddd' }]} 
+        placeholder="0.00" 
+        placeholderTextColor={isDark ? "#888" : "#999"}
+        keyboardType="numeric" 
+        value={monto} 
+        onChangeText={setMonto} 
+      />
+
+      <View style={styles.switchContainer}>
+        <Text style={[styles.label, { color: isDark ? '#fff' : '#000', marginBottom: 0 }]}>¿Es servicio?</Text>
+        <Switch value={esServicio} onValueChange={setEsServicio} />
+      </View>
+
+      <TouchableOpacity style={styles.button} onPress={handleSave}>
+        <Text style={styles.buttonText}>Guardar Gasto</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: '#fff', padding: 15, marginHorizontal: 10, marginVertical: 6, borderRadius: 8, flexDirection: 'row', justifyContent: 'space-between', elevation: 3 },
-  categoria: { fontSize: 18, fontWeight: 'bold' },
-  fecha: { color: '#666', fontSize: 12, marginTop: 4 },
-  monto: { fontSize: 16, fontWeight: 'bold', color: '#007bff' },
-  empty: { textAlign: 'center', marginTop: 50, fontSize: 16, color: '#999' }
+  container: { flex: 1, padding: 20 },
+  label: { fontSize: 16, marginBottom: 8, fontWeight: '600' },
+  input: { borderWidth: 1, padding: 12, borderRadius: 8, marginBottom: 20 },
+  switchContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  button: { backgroundColor: '#007bff', padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 10 },
+  buttonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' }
 });

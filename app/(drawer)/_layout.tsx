@@ -1,13 +1,15 @@
 import { DrawerContentScrollView, DrawerItem, DrawerItemList } from '@react-navigation/drawer';
 import { useRouter } from 'expo-router';
 import { Drawer } from 'expo-router/drawer';
+import { useColorScheme } from 'react-native';
 import { supabase } from '../../lib/supabase';
 
 function CustomDrawerContent(props: any) {
   const router = useRouter();
-
+  const isDark = useColorScheme() === 'dark';
+  
   return (
-    <DrawerContentScrollView {...props}>
+    <DrawerContentScrollView {...props} style={{ backgroundColor: isDark ? '#121212' : '#fff' }}>
       <DrawerItemList {...props} />
       <DrawerItem 
         label="Cerrar Sesión" 
@@ -22,12 +24,20 @@ function CustomDrawerContent(props: any) {
 }
 
 export default function DrawerLayout() {
+  const isDark = useColorScheme() === 'dark';
+
   return (
-    <Drawer drawerContent={(props) => <CustomDrawerContent {...props} />}>
-      {/* 'index' es el archivo principal (Registrar Gasto) */}
+    <Drawer 
+      drawerContent={(props) => <CustomDrawerContent {...props} />}
+      screenOptions={{
+        headerStyle: { backgroundColor: isDark ? '#121212' : '#fff' }, // Fondo superior
+        headerTintColor: isDark ? '#fff' : '#000', // Color del texto del título
+        drawerStyle: { backgroundColor: isDark ? '#121212' : '#fff' }, // Fondo menú
+        drawerActiveTintColor: isDark ? '#fff' : '#007bff',
+        drawerInactiveTintColor: isDark ? '#aaa' : '#666',
+      }}
+    >
       <Drawer.Screen name="index" options={{ title: 'Registrar Gasto' }} />
-      
-      {/* Tus otras pantallas */}
       <Drawer.Screen name="gastos" options={{ title: 'Mis Gastos' }} />
       <Drawer.Screen name="estadisticas" options={{ title: 'Estadísticas' }} />
       <Drawer.Screen name="herramientas" options={{ title: 'Herramientas' }} />
