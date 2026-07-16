@@ -1,76 +1,106 @@
-import { useState } from 'react';
-import { Alert, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import React, { useEffect, useState } from 'react';
+import { Alert, FlatList, SafeAreaView, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { supabase } from '../../lib/supabase';
 
-export default function RegistrarGasto() {
-  const [categoria, setCategoria] = useState('');
-  const [monto, setMonto] = useState('');
-  const [esServicio, setEsServicio] = useState(false);
-  const [fecha, setFecha] = useState(new Date());
-  const [showPicker, setShowPicker] = useState(false);
+export default function MisGastos() {
+  const [gastos, setGastos] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Detectar el modo del sistema (dark/light)
   const isDark = useColorScheme() === 'dark';
 
-  const handleSave = async () => {
-    if (!categoria || !monto) {
-      Alert.alert('Error', 'Por favor llena todos los campos');
-      return;
-    }
+  useEffect(() => {
+    fetchGastos();
+  }, []);
+
+  async function fetchGastos() {
+    setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { error } = await supabase.from('gastos').insert({
-      user_id: user.id,
-      categoria: categoria,
-      monto: parseFloat(monto),
-      fecha: new Date().toISOString(),
-      fecha_vencimiento: esServicio ? fecha.toISOString() : null,
-      estado_pago: false
-    });
+    if (!user) { setLoading(false); return; }
+
+    const { data, error } = await supabase
+      .from('gastos')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('fecha', { ascending: false });
+
     if (error) {
-      Alert.alert('Error', 'No se pudo guardar.');
+      Alert.alert("Error", "No se pudieron cargar los gastos");
+      console.error(error);
     } else {
-      Alert.alert('Éxito', 'Gasto registrado');
-      setCategoria(''); setMonto(''); setEsServicio(false);
+      setGastos(data || []);
+    }
+    setLoading(false);
+  }
+
+  const togglePago = async (id: number, currentStatus: boolean) => {
+    const { error } = await supabase
+      .from('gastos')
+      .update({ estado_pago: !currentStatus })
+      .eq('id', id);
+
+    if (error) {
+      Alert.alert("Error", "No se pudo actualizar el estado");
+    } else {
+      fetchGastos();
     }
   };
 
-  return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#121212' : '#fff' }]}>
-      <Text style={[styles.label, { color: isDark ? '#fff' : '#000' }]}>Categoría</Text>
-      <TextInput 
-        style={[styles.input, { backgroundColor: isDark ? '#1e1e1e' : '#fff', color: isDark ? '#fff' : '#000', borderColor: isDark ? '#444' : '#ddd' }]} 
-        placeholder="Ej: Luz, Comida" 
-        placeholderTextColor={isDark ? "#888" : "#999"}
-        value={categoria} 
-        onChangeText={setCategoria} 
-      />
-
-      <Text style={[styles.label, { color: isDark ? '#fff' : '#000' }]}>Monto (S/)</Text>
-      <TextInput 
-        style={[styles.input, { backgroundColor: isDark ? '#1e1e1e' : '#fff', color: isDark ? '#fff' : '#000', borderColor: isDark ? '#444' : '#ddd' }]} 
-        placeholder="0.00" 
-        placeholderTextColor={isDark ? "#888" : "#999"}
-        keyboardType="numeric" 
-        value={monto} 
-        onChangeText={setMonto} 
-      />
-
-      <View style={styles.switchContainer}>
-        <Text style={[styles.label, { color: isDark ? '#fff' : '#000', marginBottom: 0 }]}>¿Es servicio?</Text>
-        <Switch value={esServicio} onValueChange={setEsServicio} />
+  const renderItem = ({ item }: { item: any }) => (
+    <View style={[styles.card, { 
+      borderLeftColor: item.estado_pago ? '#28a745' : '#dc3545',
+      backgroundColor: isDark ? '#1e1e1e' : '#fff' 
+    }]}>
+      <View style={styles.cardContent}>
+        <View>
+          <Text style={[styles.title, { color: isDark ? '#fff' : '#000' }]}>{item.categoria}</Text>
+          <Text style={[styles.date, { color: isDark ? '#ccc' : '#666' }]}>{new Date(item.fecha).toLocaleDateString()}</Text>
+        </View>
+        <Text style={styles.amount}>S/{item.monto}</Text>
       </View>
-
-      <TouchableOpacity style={styles.button} onPress={handleSave}>
-        <Text style={styles.buttonText}>Guardar Gasto</Text>
+      <TouchableOpacity onPress={() => togglePago(item.id, item.estado_pago)}>
+        <MaterialCommunityIcons 
+          name={item.estado_pago ? "checkbox-marked" : "checkbox-blank-outline"} 
+          size={28} 
+          color={item.estado_pago ? "#28a745" : (isDark ? "#aaa" : "#ccc")} 
+        />
       </TouchableOpacity>
     </View>
+  );
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#121212' : '#f5f5f5' }]}>
+      <FlatList
+        data={gastos}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={renderItem}
+        contentContainerStyle={styles.listContainer}
+        refreshing={loading}
+        onRefresh={fetchGastos}
+      />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20 },
-  label: { fontSize: 16, marginBottom: 8, fontWeight: '600' },
-  input: { borderWidth: 1, padding: 12, borderRadius: 8, marginBottom: 20 },
-  switchContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  button: { backgroundColor: '#007bff', padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 10 },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' }
+  container: { flex: 1 },
+  listContainer: { padding: 15 },
+  card: {
+    borderRadius: 8,
+    padding: 15,
+    marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderLeftWidth: 8,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  cardContent: { flexDirection: 'row', justifyContent: 'space-between', flex: 1, marginRight: 15 },
+  title: { fontSize: 18, fontWeight: 'bold' },
+  date: { fontSize: 14 },
+  amount: { fontSize: 18, fontWeight: 'bold', color: '#007AFF' },
 });
